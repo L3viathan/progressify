@@ -1,9 +1,12 @@
 from time import sleep, time
 from math import ceil, floor
+from itertools import zip_longest
 import subprocess
 
 
 ACTIVE_PROGRESSIFYER = None
+C_UP = "\x1b[1A"
+C_KILL = "\x1b[0K"
 
 
 class ProgressifyMeta(type):
@@ -47,9 +50,9 @@ class progressify(metaclass=ProgressifyMeta):
                 self.length = None
         self.iterable = iter(iterable_maybe) if iterable_maybe else None
         self.yielded = 0
+        self.last_value = None
+        self.max_bars = 1
         self.width = width or 80
-        self._last_val = None
-        self.message = message or ""
         subprocess.run(["tput", "civis"])
         global ACTIVE_PROGRESSIFYER
         ACTIVE_PROGRESSIFYER = self
@@ -97,56 +100,61 @@ class progressify(metaclass=ProgressifyMeta):
     def __exit__(self, *whatever):
         self.cleanup()
 
-    def __call__(self, value):
+    def __del__(self):
+        self.cleanup()
+
+    def __call__(self, *values):
         available_width = (
             self.width - len(self.LEFT_EDGE) - len(self.RIGHT_EDGE) - len(self.SPACER)
         )
-        if isinstance(value, (float, int)):
-            value = value if value <= 1 else 1
-            nfull = int(available_width * value)
-            nempty = available_width - nfull
-            print(
-                "{}{}{}{}{}\r".format(
-                    self.LEFT_EDGE,
-                    self.BLOCK_FULL * nfull,
-                    self.BLOCK_EMPTY * nempty,
-                    self.RIGHT_EDGE,
-                    (self.SPACER + self.message if self.message else ""),
-                ),
-                end="",
-                flush=True,
-            )
-            self._last_val = value
-        elif isinstance(value, str):
+        self.max_bars = max(self.max_bars, len(values))
+        for value, filler in zip_longest(values, " " * self.max_bars, fillvalue=...):
+            if isinstance(value, tuple):
+                value, message = value
+            elif isinstance(value, str):
+                message = value
+                value = self.last_value
+            else:
+                message = ""
             term_width = self.get_terminal_width()
-            if len(value) + self.width > term_width:
-                value = value[: term_width - self.width - 1] + "‥"
-            if self.message:
-                self.message = " " * len(self.message)
-                self(self._last_val)
-            self.message = value
-            self(self._last_val)
-        elif value is None:
-            boxes = self.BLOCKS_UNDEFINED * ceil(
-                available_width / len(self.BLOCKS_UNDEFINED)
-            )
-            t = floor(time() * len(self.BLOCKS_UNDEFINED)) % len(self.BLOCKS_UNDEFINED)
-            print(
-                "{}{}{}{}\r".format(
-                    self.LEFT_EDGE,
-                    "{}{}".format(boxes[t:], boxes[:t])[:available_width],
-                    self.RIGHT_EDGE,
-                    self.message,
-                ),
-                end="",
-                flush=True,
-            )
-            self._last_val = value
+            if len(message) + self.width > term_width:
+                message = message[: term_width - self.width - 1] + "‥"
+            if isinstance(value, (float, int)):
+                value = value if value <= 1 else 1
+                nfull = int(available_width * value)
+                nempty = available_width - nfull
+                print(
+                    "{}{}{}{}{}{}".format(
+                        C_KILL,
+                        self.LEFT_EDGE,
+                        self.BLOCK_FULL * nfull,
+                        self.BLOCK_EMPTY * nempty,
+                        self.RIGHT_EDGE,
+                        (self.SPACER + message if message else ""),
+                    )
+                )
+            elif value is None:
+                boxes = self.BLOCKS_UNDEFINED * ceil(
+                    available_width / len(self.BLOCKS_UNDEFINED)
+                )
+                t = floor(time() * len(self.BLOCKS_UNDEFINED)) % len(
+                    self.BLOCKS_UNDEFINED
+                )
+                print(
+                    "{}{}{}{}".format(
+                        self.LEFT_EDGE,
+                        "{}{}".format(boxes[t:], boxes[:t])[:available_width],
+                        self.RIGHT_EDGE,
+                        message,
+                    )
+                )
+            elif value is ...:
+                print(C_KILL)
+            self.last_value = value
+        print(C_UP * self.max_bars, end="", flush=True)
 
     def cleanup(self):
-        if self.message:
-            self.message = " " * len(self.message)
-            self(self._last_val)
+        print((C_KILL + "\n") * self.max_bars, C_UP * self.max_bars, flush=True, end="")
         subprocess.run(["tput", "cnorm"])
         global ACTIVE_PROGRESSIFYER
         ACTIVE_PROGRESSIFYER = None
@@ -165,15 +173,25 @@ for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
 with progressify(style="laola") as p:
     for i in range(10, -1, -1):
         p(i / 10)
-        sleep(0.2)
     for _ in range(25):
         p(None)
         sleep(0.02)
     p.set_style()
-    for _ in range(25):
-        p(None)
+    for i in range(25):
+        p(None, i / 25)
         sleep(0.02)
     p("An incredibly long message; too long to fit on our small screen")
     for i in range(25):
         p((i + 1) / 25)
         sleep(0.02)
+    for i, im in zip(range(4), ["Homer", "Marge", "Bart", "Lisa"]):
+        for j, jm in zip(
+            range(7), ["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]
+        ):
+            for k, km in zip(range(3), ["cheese", "wine", "you"]):
+                p(((i + 1) / 4, im), ((j + 1) / 7, jm), ((k + 1) / 3, km))
+                sleep(0.1)
+
+for i, im in progressify(["foo", "bar", "bat"]):
+    for j, jm in progressify(["bla", "Baaaa"]):
+        ...
