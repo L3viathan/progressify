@@ -62,6 +62,17 @@ class ProgressBar:
         self.message = message
         self.value = value
 
+    @property
+    def message(self):
+        return self._message
+
+    @message.setter
+    def message(self, msg):
+        if msg is not None:
+            self._message = str(msg)
+        else:
+            self._message = None
+
     def set_style(self, style=None):
         styles = {
             None: {
@@ -187,36 +198,48 @@ def progressify(iterable_or_function=None, **kwargs):
         return ProgressBar(**kwargs)
 
 
-with progressify(style="laola") as outer:
-    outer.message = "Hello"
-    for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
-        ProgressBar.last.message = item
-        sleep(0.25)
+# with progressify(style="laola") as outer:
+#     outer.message = "Hello"
+#     for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
+#         ProgressBar.last.message = item
+#         sleep(0.25)
 
-with progressify(style="laola") as p:
-    for i in range(10, -1, -1):
-        p.value = i / 10
-    for _ in range(25):
-        p.value = None
-        sleep(0.02)
-    p.set_style()
-    for i in range(25):
-        sleep(0.02)
-    p.value = "An incredibly long message; too long to fit on our small screen"
-    for i in range(25):
-        p.value = (i + 1) / 25
-        sleep(0.02)
+# with progressify(style="laola") as p:
+#     for i in range(10, -1, -1):
+#         p.value = i / 10
+#         sleep(0.02)
+#     for _ in range(25):
+#         p.value = None
+#         sleep(0.02)
+#     p.set_style()
+#     for i in range(25):
+#         sleep(0.02)
+#     p.message = "An incredibly long message; too long to fit on our small screen"
+#     for i in range(25):
+#         p.value = (i + 1) / 25
+#         sleep(0.02)
 
-for i, im in zip(range(4), progressify(["Homer", "Marge", "Bart", "Lisa"])):
-    ProgressBar.instances[0].message = im
-    ProgressBar.instances[0].value = (i + 1) / 4
-    for j, jm in zip(
-        range(4),
-        progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]),
-    ):
-        ProgressBar.instances[1].message = jm
-        ProgressBar.instances[1].value = (j + 1) / 7
-        for k, km in zip(range(3), progressify(["cheese", "wine", "you"])):
-            ProgressBar.instances[2].message = km
-            ProgressBar.instances[2].value = (k + 1) / 3
-            sleep(0.1)
+# for i, im in zip(range(4), progressify(["Homer", "Marge", "Bart", "Lisa"])):
+#     ProgressBar.instances[0].message = im
+#     ProgressBar.instances[0].value = (i + 1) / 4
+#     for j, jm in zip(
+#         range(4),
+#         progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]),
+#     ):
+#         ProgressBar.instances[1].message = jm
+#         ProgressBar.instances[1].value = (j + 1) / 7
+#         for k, km in zip(range(3), progressify(["cheese", "wine", "you"])):
+#             ProgressBar.instances[2].message = km
+#             ProgressBar.instances[2].value = (k + 1) / 3
+#             sleep(0.1)
+
+@progressify
+def test(*, progress_bar):
+    for _ in range(20):
+        sleep(0.1)
+    for i in range(20):
+        progress_bar.value = i/20
+        progress_bar.message = str(i)
+        sleep(0.1)
+
+test()
