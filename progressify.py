@@ -1,5 +1,6 @@
+import inspect
 import subprocess
-from itertools import zip_longest, count
+from functools import wraps
 from math import ceil, floor
 from threading import Thread, Lock
 from time import sleep, time
@@ -156,7 +157,15 @@ class ProgressBar:
 
 def progressify(iterable_or_function=None, **kwargs):
     if callable(iterable_or_function):
-        ...  # act as a decorator FIXME
+        argspec = inspect.getfullargspec(iterable_or_function)
+        supply_bar = "progress_bar" in argspec.kwonlyargs or argspec.varkw
+        @wraps(iterable_or_function)
+        def wrapper(*args, **kwargs):
+            with ProgressBar() as p:
+                if supply_bar:
+                    return iterable_or_function(*args, progress_bar=p, **kwargs)
+                return iterable_or_function(*args, **kwargs)
+        return wrapper
     try:
         it = iter(iterable_or_function)
         try:
