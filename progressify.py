@@ -1,23 +1,39 @@
-from time import sleep, time
-from math import ceil, floor
-from itertools import zip_longest
 import subprocess
+from itertools import zip_longest, count
+from math import ceil, floor
+from threading import Thread, Lock
+from time import sleep, time
 
-
-ACTIVE_PROGRESSIFYER = None
 C_UP = "\x1b[1A"
 C_KILL = "\x1b[0K"
 
-
-class ProgressifyMeta(type):
-    def __call__(self, *args, **kwargs):
-        if ACTIVE_PROGRESSIFYER:
-            return ACTIVE_PROGRESSIFYER(*args, **kwargs)
-        return super().__call__(*args, **kwargs)
+lock = Lock()
 
 
-class progressify(metaclass=ProgressifyMeta):
-    def __init__(self, iterable_maybe=None, width=None, message=None, style=None):
+def work(instances):
+    with lock:
+        last_instances = 0
+
+        while instances:
+            print(f"\r{C_KILL}{C_UP}"*last_instances, end="", flush=True)
+            num_instances = None
+            for num_instances, instance in enumerate(instances):
+                instance.draw()
+            if num_instances is None:
+                break
+            num_instances += 1
+            last_instances = num_instances
+            sleep(0.05)
+        print(f"\r{C_KILL}{C_UP}"*(last_instances+1), end="", flush=True)
+        subprocess.run(["tput", "cnorm"])
+
+
+class ProgressBar:
+    instances = []
+    thread = None
+    last = None
+
+    def __init__(self, value=None, width=None, message=None, style=None):
         """
         Show a progress bar.
         This should be able to be used in the following ways:
@@ -41,21 +57,9 @@ class progressify(metaclass=ProgressifyMeta):
             - What we return needs to be iterable.
         """
         self.set_style(style)
-        try:
-            self.length = len(iterable_maybe)
-        except TypeError:
-            try:
-                self.length = iterable_maybe.__length_hint__()
-            except AttributeError:
-                self.length = None
-        self.iterable = iter(iterable_maybe) if iterable_maybe else None
-        self.yielded = 0
-        self.last_value = None
-        self.max_bars = 1
         self.width = width or 80
-        subprocess.run(["tput", "civis"])
-        global ACTIVE_PROGRESSIFYER
-        ACTIVE_PROGRESSIFYER = self
+        self.message = message
+        self.value = value
 
     def set_style(self, style=None):
         styles = {
@@ -79,85 +83,69 @@ class progressify(metaclass=ProgressifyMeta):
         elif style in styles:
             self.set_style({**styles[None], **styles[style]})
 
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        self.yielded += 1
-        self.draw()
-        try:
-            return next(self.iterable)
-        except StopIteration as e:
-            self.cleanup()
-            raise e
-
     def draw(self):
-        self(self.yielded / (self.length + 1))
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *whatever):
-        self.cleanup()
-
-    def __del__(self):
-        self.cleanup()
-
-    def __call__(self, *values):
+        message = self.message
+        value = self.value
         available_width = (
             self.width - len(self.LEFT_EDGE) - len(self.RIGHT_EDGE) - len(self.SPACER)
         )
-        self.max_bars = max(self.max_bars, len(values))
-        for value, filler in zip_longest(values, " " * self.max_bars, fillvalue=...):
-            if isinstance(value, tuple):
-                value, message = value
-            elif isinstance(value, str):
-                message = value
-                value = self.last_value
-            else:
-                message = ""
-            term_width = self.get_terminal_width()
-            if len(message) + self.width > term_width:
-                message = message[: term_width - self.width - 1] + "‥"
-            if isinstance(value, (float, int)):
-                value = value if value <= 1 else 1
-                nfull = int(available_width * value)
-                nempty = available_width - nfull
-                print(
-                    "{}{}{}{}{}{}".format(
-                        C_KILL,
-                        self.LEFT_EDGE,
-                        self.BLOCK_FULL * nfull,
-                        self.BLOCK_EMPTY * nempty,
-                        self.RIGHT_EDGE,
-                        (self.SPACER + message if message else ""),
-                    )
-                )
-            elif value is None:
-                boxes = self.BLOCKS_UNDEFINED * ceil(
-                    available_width / len(self.BLOCKS_UNDEFINED)
-                )
-                t = floor(time() * len(self.BLOCKS_UNDEFINED)) % len(
-                    self.BLOCKS_UNDEFINED
-                )
-                print(
-                    "{}{}{}{}".format(
-                        self.LEFT_EDGE,
-                        "{}{}".format(boxes[t:], boxes[:t])[:available_width],
-                        self.RIGHT_EDGE,
-                        message,
-                    )
-                )
-            elif value is ...:
-                print(C_KILL)
-            self.last_value = value
-        print(C_UP * self.max_bars, end="", flush=True)
+        term_width = self.get_terminal_width()
+        if message and len(message) + self.width > term_width:
+            message = message[: term_width - self.width - 1] + "‥"
+        if isinstance(value, (float, int)):
+            value = value if value <= 1 else 1
+            nfull = int(available_width * value)
+            nempty = available_width - nfull
+            print(
+                "{}{}{}{}{}".format(
+                    self.LEFT_EDGE,
+                    self.BLOCK_FULL * nfull,
+                    self.BLOCK_EMPTY * nempty,
+                    self.RIGHT_EDGE,
+                    (self.SPACER + message if message else ""),
+                ),
+            )
+        elif value is None:
+            boxes = self.BLOCKS_UNDEFINED * ceil(
+                available_width / len(self.BLOCKS_UNDEFINED)
+            )
+            t = floor(time() * len(self.BLOCKS_UNDEFINED)) % len(self.BLOCKS_UNDEFINED)
+            print(
+                "{}{}{}{}".format(
+                    self.LEFT_EDGE,
+                    "{}{}".format(boxes[t:], boxes[:t])[:available_width],
+                    self.RIGHT_EDGE,
+                    message or "",
+                ),
+            )
 
-    def cleanup(self):
-        print((C_KILL + "\n") * self.max_bars, C_UP * self.max_bars, flush=True, end="")
-        subprocess.run(["tput", "cnorm"])
-        global ACTIVE_PROGRESSIFYER
-        ACTIVE_PROGRESSIFYER = None
+    def __enter__(self):
+        ProgressBar.instances.append(self)
+        ProgressBar.last = self
+        # if we are the first, start the thread
+        if len(ProgressBar.instances) == 1:
+            res = lock.acquire(blocking=False)
+            if res:
+                self.start_thread()
+                subprocess.run(["tput", "civis"])
+                lock.release()
+        return self
+
+    def __exit__(self, *args):
+        ProgressBar.instances.pop()
+        if ProgressBar.instances:
+            ProgressBar.last = ProgressBar.instances[-1]
+        else:
+            ProgressBar.last = None
+
+    @classmethod
+    def start_thread(cls):
+        cls.thread = Thread(target=work, args=(cls.instances,))
+        cls.thread.start()
+
+    @classmethod
+    def stop_thread(cls):
+        cls.thread.stop()
 
     @staticmethod
     def get_terminal_width():
@@ -166,32 +154,60 @@ class progressify(metaclass=ProgressifyMeta):
         return w
 
 
-for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
-    progressify(item)
-    sleep(0.25)
+def progressify(iterable_or_function=None, **kwargs):
+    if callable(iterable_or_function):
+        ...  # act as a decorator FIXME
+    try:
+        it = iter(iterable_or_function)
+        try:
+            length = len(iterable_or_function)
+        except TypeError:
+            try:
+                length = iterable_or_function.__length_hint__()
+            except AttributeError:
+                length = None
+
+        def generator():
+            with ProgressBar(0, **kwargs) as bar:
+                for i, element in enumerate(it):
+                    bar.value = (i + 1) / length
+                    yield element
+
+        return generator()
+    except TypeError:
+        return ProgressBar(**kwargs)
+
+
+with progressify(style="laola") as outer:
+    outer.message = "Hello"
+    for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
+        ProgressBar.last.message = item
+        sleep(0.25)
 
 with progressify(style="laola") as p:
     for i in range(10, -1, -1):
-        p(i / 10)
+        p.value = i / 10
     for _ in range(25):
-        p(None)
+        p.value = None
         sleep(0.02)
     p.set_style()
     for i in range(25):
-        p(None, i / 25)
         sleep(0.02)
-    p("An incredibly long message; too long to fit on our small screen")
+    p.value = "An incredibly long message; too long to fit on our small screen"
     for i in range(25):
-        p((i + 1) / 25)
+        p.value = (i + 1) / 25
         sleep(0.02)
-    for i, im in zip(range(4), ["Homer", "Marge", "Bart", "Lisa"]):
-        for j, jm in zip(
-            range(7), ["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]
-        ):
-            for k, km in zip(range(3), ["cheese", "wine", "you"]):
-                p(((i + 1) / 4, im), ((j + 1) / 7, jm), ((k + 1) / 3, km))
-                sleep(0.1)
 
-for i, im in progressify(["foo", "bar", "bat"]):
-    for j, jm in progressify(["bla", "Baaaa"]):
-        ...
+for i, im in zip(range(4), progressify(["Homer", "Marge", "Bart", "Lisa"])):
+    ProgressBar.instances[0].message = im
+    ProgressBar.instances[0].value = (i + 1) / 4
+    for j, jm in zip(
+        range(4),
+        progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]),
+    ):
+        ProgressBar.instances[1].message = jm
+        ProgressBar.instances[1].value = (j + 1) / 7
+        for k, km in zip(range(3), progressify(["cheese", "wine", "you"])):
+            ProgressBar.instances[2].message = km
+            ProgressBar.instances[2].value = (k + 1) / 3
+            sleep(0.1)
