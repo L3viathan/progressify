@@ -1,7 +1,8 @@
 import inspect
 import builtins
 import subprocess
-from functools import wraps
+from functools import wraps, reduce
+from operator import xor
 from math import ceil, floor
 from threading import Thread, Lock
 from time import sleep, time
@@ -16,8 +17,15 @@ print_lock = Lock()
 def work(instances):
     with thread_lock:
         last_instances = 0
+        last_hash = None
 
         while instances:
+            while True:
+                current_hash = reduce(xor, [i.hash() for i in instances], 0)
+                if current_hash != last_hash:
+                    last_hash = current_hash
+                    break
+                sleep(0.1)
             with print_lock:
                 # print(f"\r{C_KILL}{C_UP}"*last_instances, end="", flush=True)
                 num_instances = None
@@ -29,7 +37,7 @@ def work(instances):
             num_instances += 1
             print(C_UP*num_instances, end="", flush=True)
             last_instances = num_instances
-            sleep(0.05)
+            sleep(0.1)
         with print_lock:
             print("\n"*(last_instances+1), end="", flush=True)
             print(f"\r{C_KILL}{C_UP}"*(last_instances+2), end="", flush=True)
@@ -73,6 +81,9 @@ class ProgressBar:
     def message(self):
         return self._message
 
+    def hash(self):
+        return hash(self._message) ^ hash(self.value)
+
     @message.setter
     def message(self, msg):
         if msg is not None:
@@ -88,6 +99,14 @@ class ProgressBar:
                 "undefined": " ░▒▓▒░",
                 "left": "╡",
                 "right": "╞",
+                "spacer": " ",
+            },
+            "classic": {
+                "full": "#",
+                "empty": " ",
+                "undefined": "-/-\\                        ",
+                "left": "[",
+                "right": "]",
                 "spacer": " ",
             },
             "laola": {"undefined": "▂▃▄▅▆▇█▇▆▅▄▃▂"},
@@ -218,44 +237,44 @@ if __name__ == '__main__':
     #         ProgressBar.last.message = item
     #         sleep(0.25)
 
-    # with progressify(style="laola") as p:
-    #     for i in range(10, -1, -1):
-    #         p.value = i / 10
-    #         sleep(0.02)
-    #     for _ in range(25):
-    #         p.value = None
-    #         sleep(0.02)
-    #     p.set_style()
-    #     for i in range(25):
-    #         sleep(0.02)
-    #     p.message = "An incredibly long message; too long to fit on our small screen"
-    #     for i in range(25):
-    #         p.value = (i + 1) / 25
-    #         sleep(0.02)
+    with progressify(style="laola") as p:
+        for i in range(10, -1, -1):
+            p.value = i / 10
+            sleep(0.02)
+        for _ in range(25):
+            p.value = None
+            sleep(0.02)
+        p.set_style()
+        for i in range(25):
+            sleep(0.02)
+        p.message = "An incredibly long message; too long to fit on our small screen"
+        for i in range(25):
+            p.value = (i + 1) / 25
+            sleep(0.02)
 
-    # for i, im in zip(range(2), progressify(["Homer", "Marge", "Bart", "Lisa"])):
-    #     ProgressBar.instances[0].message = im
-    #     ProgressBar.instances[0].value = (i + 1) / 4
-    #     for j, jm in zip(
-    #         range(2),
-    #         progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"]),
-    #     ):
-    #         ProgressBar.instances[1].message = jm
-    #         ProgressBar.instances[1].value = (j + 1) / 7
-    #         for k, km in zip(range(3), progressify(["cheese", "wine", "you"])):
-    #             ProgressBar.instances[2].message = km
-    #             ProgressBar.instances[2].value = (k + 1) / 3
-    #             sleep(0.1)
+    for i, im in zip(range(4), progressify(["Homer", "Marge", "Bart", "Lisa"], style="classic")):
+        ProgressBar.instances[0].message = im
+        ProgressBar.instances[0].value = (i + 1) / 4
+        for j, jm in zip(
+            range(7),
+            progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"], style="classic"),
+        ):
+            ProgressBar.instances[1].message = jm
+            ProgressBar.instances[1].value = (j + 1) / 7
+            for k, km in zip(range(3), progressify(["cheese", "wine", "you"], style="classic")):
+                ProgressBar.instances[2].message = km
+                ProgressBar.instances[2].value = (k + 1) / 3
+                sleep(1)
 
-    @progressify
-    def test(*, progress_bar):
-        for _ in range(20):
-            sleep(0.1)
-        for i in range(20):
-            progress_bar.value = i/20
-            progress_bar.message = i
-            if i % 5 == 0:
-                progress_bar.print("hello from", i)
-            sleep(0.1)
+#     @progressify
+#     def test(*, progress_bar):
+#         for _ in range(20):
+#             sleep(0.1)
+#         for i in range(20):
+#             progress_bar.value = i/20
+#             progress_bar.message = i
+#             if i % 5 == 0:
+#                 progress_bar.print("hello from", i)
+#             sleep(0.1)
 
-    test()
+#     test()
