@@ -82,6 +82,8 @@ class ProgressBar:
         return self._message
 
     def hash(self):
+        if self.value is None:
+            return hash(time())
         return hash(self._message) ^ hash(self.value)
 
     @message.setter
@@ -264,17 +266,17 @@ if __name__ == '__main__':
             for k, km in zip(range(3), progressify(["cheese", "wine", "you"], style="classic")):
                 ProgressBar.instances[2].message = km
                 ProgressBar.instances[2].value = (k + 1) / 3
-                sleep(1)
+                sleep(0.1)
 
-#     @progressify
-#     def test(*, progress_bar):
-#         for _ in range(20):
-#             sleep(0.1)
-#         for i in range(20):
-#             progress_bar.value = i/20
-#             progress_bar.message = i
-#             if i % 5 == 0:
-#                 progress_bar.print("hello from", i)
-#             sleep(0.1)
+    @progressify
+    def test(*, progress_bar):
+        for _ in range(20):
+            sleep(0.1)
+        for i in range(20):
+            progress_bar.value = i/20
+            progress_bar.message = i
+            if i % 5 == 0:
+                progress_bar.print("hello from", i)
+            sleep(0.1)
 
-#     test()
+    test()
