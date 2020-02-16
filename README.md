@@ -13,7 +13,7 @@ _Build progress bars from iterables, as a decorator, or as a context manager._
 In its simplest form, you just use progressify in order to loop over some
 iterable:
 
-    from progressify import progressify
+    import progressify
 
     for element in progressify(range(100)):
         # do something
@@ -53,6 +53,10 @@ progressify supports nested progress bars. The following code will display two p
     for x in progressify(range(10)):
         for y in progressify(range(5)):
             do_something(x, y)
+
+When you're using progressify like this, and you want to change the message or
+want to set a different attribute on the current progress bar, you can use
+`progressify.last` to access the last progress bar instance.
 
 By default, box-drawing characters are used to draw the progress bar, but the
 style can be changed, either by passing a keyword argument `style` to

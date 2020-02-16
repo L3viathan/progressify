@@ -49,14 +49,14 @@ def work(instances):
             last_instances = num_instances
             sleep(0.1)
         for _ in range(last_instances):
-            out(C_UP, C_KILL, "\r")
+            out(C_UP, "\r", C_KILL)
+        out("\n")
         subprocess.run(["tput", "cnorm"])
 
 
 class ProgressBar:
     instances = []
     thread = None
-    last = None
 
     def __init__(self, value=None, width=None, message=None, style=None):
         """
@@ -172,7 +172,7 @@ class ProgressBar:
 
     def __enter__(self):
         ProgressBar.instances.append(self)
-        ProgressBar.last = self
+        progressify.last = self
         # if we are the first, start the thread
         if len(ProgressBar.instances) == 1:
             res = thread_lock.acquire(blocking=False)
@@ -186,9 +186,9 @@ class ProgressBar:
     def __exit__(self, *args):
         ProgressBar.instances.pop()
         if ProgressBar.instances:
-            ProgressBar.last = ProgressBar.instances[-1]
+            progressify.last = ProgressBar.instances[-1]
         else:
-            ProgressBar.last = None
+            progressify.last = None
             builtins.print = orig_print
 
     @classmethod
@@ -239,11 +239,15 @@ def progressify(iterable_or_function=None, **kwargs):
         return ProgressBar(**kwargs)
 
 
+progressify.last = None
+sys.modules["progressify"] = progressify
+
+
 if __name__ == '__main__':
     with progressify(style="laola") as outer:
         outer.message = "Hello"
         for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
-            ProgressBar.last.message = item
+            progressify.last.message = item
             sleep(0.25)
 
     with progressify(style="laola") as p:
