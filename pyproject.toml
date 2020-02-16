@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "progressify"
-version = "0.2.0"
+version = "0.2.1"
 description = "Progress bar from an iterable, as a context manager, or decorator"
 authors = ["L3viathan <git@l3vi.de>"]
 license = "MIT"
