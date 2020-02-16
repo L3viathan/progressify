@@ -47,7 +47,7 @@ def work(instances):
                 break
             num_instances += 1
             last_instances = num_instances
-            sleep(0.1)
+            sleep(0.05)
         for _ in range(last_instances):
             out(C_UP, "\r", C_KILL)
         out("\n")
@@ -115,12 +115,12 @@ class ProgressBar:
             "classic": {
                 "full": "#",
                 "empty": " ",
-                "undefined": "-/-\\                        ",
+                "undefined": "_,-'°'-,",
                 "left": "[",
                 "right": "]",
                 "spacer": " ",
             },
-            "laola": {"undefined": "▂▃▄▅▆▇█▇▆▅▄▃▂"},
+            "laola": {"undefined": "▂▂▂▃▃▄▅▆▇▇███▇▇▆▅▄▃▃"},
         }
         if isinstance(style, dict):
             self.BLOCK_FULL = style.get("full", styles[None]["full"])
