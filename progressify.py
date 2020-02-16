@@ -1,3 +1,4 @@
+import sys
 import inspect
 import subprocess
 import builtins
@@ -16,7 +17,7 @@ prints = deque()
 orig_print = builtins.print
 
 def out(*args, **kwargs):
-    orig_print(*args, **kwargs, sep="", end="", flush=True)
+    orig_print(*args, **kwargs, sep="", end="", flush=True, file=sys.stderr)
 
 def safe_print(*args, **kwargs):
     prints.append((args, kwargs))
@@ -122,12 +123,12 @@ class ProgressBar:
             "laola": {"undefined": "▂▃▄▅▆▇█▇▆▅▄▃▂"},
         }
         if isinstance(style, dict):
-            self.BLOCK_FULL = style["full"]
-            self.BLOCK_EMPTY = style["empty"]
-            self.BLOCKS_UNDEFINED = style["undefined"]
-            self.LEFT_EDGE = style["left"]
-            self.RIGHT_EDGE = style["right"]
-            self.SPACER = style["spacer"]
+            self.BLOCK_FULL = style.get("full", styles[None]["full"])
+            self.BLOCK_EMPTY = style.get("empty", styles[None]["empty"])
+            self.BLOCKS_UNDEFINED = style.get("undefined", styles[None]["undefined"])
+            self.LEFT_EDGE = style.get("left", styles[None]["left"])
+            self.RIGHT_EDGE = style.get("right", styles[None]["right"])
+            self.SPACER = style.get("spacer", styles[None]["spacer"])
         elif style in styles:
             self.set_style({**styles[None], **styles[style]})
 
@@ -152,6 +153,7 @@ class ProgressBar:
                     self.RIGHT_EDGE,
                     (self.SPACER + message if message else ""),
                 ),
+                file=sys.stderr,
             )
         elif value is None:
             boxes = self.BLOCKS_UNDEFINED * ceil(
@@ -165,6 +167,7 @@ class ProgressBar:
                     self.RIGHT_EDGE,
                     message or "",
                 ),
+                file=sys.stderr,
             )
 
     def __enter__(self):
