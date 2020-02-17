@@ -84,7 +84,7 @@ class ProgressBar:
             - What we return needs to be iterable.
         """
         self.set_style(style)
-        self.width = width or 80
+        self.width = width or (self.get_terminal_width() // 3) * 2
         self.message = message
         self.value = value
 
