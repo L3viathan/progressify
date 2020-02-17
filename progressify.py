@@ -16,8 +16,10 @@ thread_lock = Lock()
 prints = deque()
 orig_print = builtins.print
 
+
 def out(*args, **kwargs):
     orig_print(*args, **kwargs, sep="", end="", flush=True, file=sys.stderr)
+
 
 def safe_print(*args, **kwargs):
     prints.append((args, kwargs))
@@ -105,16 +107,14 @@ class ProgressBar:
     def set_style(self, style=None):
         styles = {
             None: {
-                "full": "█",
-                "empty": "░",
+                "main": " ▏▎▍▌▋▊▉█",
                 "undefined": " ░▒▓▒░",
-                "left": "╡",
-                "right": "╞",
+                "left": "╢",
+                "right": "╟",
                 "spacer": " ",
             },
             "classic": {
-                "full": "#",
-                "empty": " ",
+                "main": " #",
                 "undefined": "_,-'°'-,",
                 "left": "[",
                 "right": "]",
@@ -123,14 +123,26 @@ class ProgressBar:
             "laola": {"undefined": "▂▂▂▃▃▄▅▆▇▇███▇▇▆▅▄▃▃"},
         }
         if isinstance(style, dict):
-            self.BLOCK_FULL = style.get("full", styles[None]["full"])
-            self.BLOCK_EMPTY = style.get("empty", styles[None]["empty"])
+            self.BLOCK_MAIN = style.get("main", styles[None]["main"])
             self.BLOCKS_UNDEFINED = style.get("undefined", styles[None]["undefined"])
             self.LEFT_EDGE = style.get("left", styles[None]["left"])
             self.RIGHT_EDGE = style.get("right", styles[None]["right"])
             self.SPACER = style.get("spacer", styles[None]["spacer"])
         elif style in styles:
             self.set_style({**styles[None], **styles[style]})
+
+    def bar_from_fraction(self, available_width, value):
+        hoch = int(available_width * value * len(self.BLOCK_MAIN))
+        nfull = hoch // len(self.BLOCK_MAIN)
+        partial_shade = hoch % len(self.BLOCK_MAIN)
+        nempty = available_width - nfull - 1
+        if nempty >= 0:
+            return "{}{}{}".format(
+                self.BLOCK_MAIN[-1] * nfull,
+                self.BLOCK_MAIN[partial_shade],
+                self.BLOCK_MAIN[0] * nempty,
+            )
+        return self.BLOCK_MAIN[-1] * nfull
 
     def draw(self):
         message = self.message
@@ -143,13 +155,10 @@ class ProgressBar:
             message = message[: term_width - self.width - 1] + "‥"
         if isinstance(value, (float, int)):
             value = value if value <= 1 else 1
-            nfull = int(available_width * value)
-            nempty = available_width - nfull
             orig_print(
-                "{}{}{}{}{}".format(
+                "{}{}{}{}".format(
                     self.LEFT_EDGE,
-                    self.BLOCK_FULL * nfull,
-                    self.BLOCK_EMPTY * nempty,
+                    self.bar_from_fraction(available_width, value),
                     self.RIGHT_EDGE,
                     (self.SPACER + message if message else ""),
                 ),
@@ -211,12 +220,14 @@ def progressify(iterable_or_function=None, **kwargs):
     if callable(iterable_or_function):
         argspec = inspect.getfullargspec(iterable_or_function)
         supply_bar = "progress_bar" in argspec.kwonlyargs or argspec.varkw
+
         @wraps(iterable_or_function)
         def wrapper(*args, **kwargs):
             with ProgressBar() as p:
                 if supply_bar:
                     return iterable_or_function(*args, progress_bar=p, **kwargs)
                 return iterable_or_function(*args, **kwargs)
+
         return wrapper
     try:
         it = iter(iterable_or_function)
@@ -243,7 +254,7 @@ progressify.last = None
 sys.modules["progressify"] = progressify
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with progressify(style="laola") as outer:
         outer.message = "Hello"
         for item in progressify("Luke... I am your father! NOOOOOOOO!".split()):
@@ -265,16 +276,23 @@ if __name__ == '__main__':
             p.value = (i + 1) / 25
             sleep(0.02)
 
-    for i, im in zip(range(4), progressify(["Homer", "Marge", "Bart", "Lisa"], style="classic")):
+    for i, im in zip(
+        range(4), progressify(["Homer", "Marge", "Bart", "Lisa"], style="classic")
+    ):
         ProgressBar.instances[0].message = im
         ProgressBar.instances[0].value = (i + 1) / 4
         for j, jm in zip(
             range(7),
-            progressify(["likes", "loves", "hates", "dislikes", "has", "makes", "wants"], style="classic"),
+            progressify(
+                ["likes", "loves", "hates", "dislikes", "has", "makes", "wants"],
+                style="classic",
+            ),
         ):
             ProgressBar.instances[1].message = jm
             ProgressBar.instances[1].value = (j + 1) / 7
-            for k, km in zip(range(3), progressify(["cheese", "wine", "you"], style="classic")):
+            for k, km in zip(
+                range(3), progressify(["cheese", "wine", "you"], style="classic")
+            ):
                 ProgressBar.instances[2].message = km
                 ProgressBar.instances[2].value = (k + 1) / 3
                 sleep(0.1)
@@ -284,7 +302,7 @@ if __name__ == '__main__':
         for _ in range(20):
             sleep(0.1)
         for i in range(20):
-            progress_bar.value = i/20
+            progress_bar.value = i / 20
             progress_bar.message = i
             if i % 5 == 0:
                 print("hello from", i)
