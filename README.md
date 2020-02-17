@@ -63,7 +63,7 @@ style can be changed, either by passing a keyword argument `style` to
 progressify, or by calling `.set_style` on a progress bar instance. The passed
 value can either be a string (the name of a pre-defined style; currently
 "classic" (ASCII-only) or "laola"), or a dictionary containing bindings for at
-least some of the characters, e.g. `{"full": "X", "empty": "_"}`.
+least some of the characters, e.g. `{"main": " X", "empty": "_"}`.
 
 ## Caveats
 
