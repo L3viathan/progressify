@@ -2,7 +2,7 @@
 
 _Build progress bars from iterables, as a decorator, or as a context manager._
 
-![a preview](https://thumbs.gfycat.com/UnderstatedPettyIndochinesetiger-size_restricted.gif)
+![a preview](https://thumbs.gfycat.com/NimbleInbornFlounder-size_restricted.gif)
 
 ## Installation
 
